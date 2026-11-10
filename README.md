@@ -20,8 +20,9 @@ npm run posters    # regenera posters e og-image a partir do build (precisa do C
 | Todo o texto dos capítulos | `lib/content.ts` e `app/page.tsx` |
 | Cores, tipografia, layout, mobile | `app/globals.css` (tokens de `design/tokens.css`) |
 | Câmera por capítulo, sol, luzes, tablet | `components/scene/Experience.tsx` |
-| Módulo (objetos `DS_*`), ciclo e vista explodida | `components/scene/Module.tsx` |
-| Ilha (objetos `IS_*`), estrada, placas, prêmios | `components/scene/Island.tsx` |
+| Módulo: ciclo, corte e vista explodida | `components/scene/Module.tsx` |
+| Ilha: placas, prêmios, bicicleta, drone | `components/scene/Island.tsx` |
+| Geometria dos modelos | `blender/build_desol.py` |
 | Scroll, navegação, cursor, listas interativas | `components/Client.tsx` |
 
 ## Como funciona
@@ -31,9 +32,25 @@ npm run posters    # regenera posters e og-image a partir do build (precisa do C
 - `prefers-reduced-motion`: sem scroll suave, câmera em cortes secos, animações ociosas paradas.
 - Celular: sem pós-processamento, `dpr` máximo 1,5, cards rolando por baixo da cena.
 
-## Estado do 3D
+## 3D
 
-A cena usa **placeholders em código** com os nomes de objeto de `docs/04_BLENDER_3D.md`. A Etapa B (modelos no Blender, GLB em `public/models/`) ainda não foi feita: o Blender não estava conectado ao MCP Higgsfield.
+Os modelos são gerados por script no Blender e carregados pelo site como GLB:
+
+| Arquivo | Peso | Triângulos |
+| --- | --- | --- |
+| `public/models/desol-module.glb` | 60 KB | 10,5 mil |
+| `public/models/desol-island.glb` | 179 KB | 28,7 mil |
+
+Para mudar um modelo:
+
+1. Edite `blender/build_desol.py` (dimensões no sistema do site; `T()` converte para o Blender).
+2. No Blender, rode o script e chame `build_all()` e `export_all()`; os GLB sem compressão saem em `blender/export/`.
+3. `npm run models` aplica Draco e grava em `public/models/`.
+4. `npm run build && npm run posters` atualiza os posters.
+
+O `.blend` mestre fica em `blender/desol-master.blend`. O código acha as peças pelo nome (`DS_*`, `IS_*`) e avisa no console, em desenvolvimento, se alguma faltar. Vapor, raios de sol, cristais de sal, gotas e as folhas que se dobram continuam feitos em código.
+
+Diferenças em relação a `docs/04_BLENDER_3D.md`: a luz da ilha não foi assada (o site calcula sombras em tempo real), os props foram modelados à mão em vez de gerados, e os posters saem do próprio site, não de renders do Blender.
 
 ## Regras de conteúdo
 

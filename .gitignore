@@ -5,3 +5,5 @@ out
 next-env.d.ts
 .DS_Store
 referencias/*.mp4
+*.blend1
+blender/renders/check-*.png

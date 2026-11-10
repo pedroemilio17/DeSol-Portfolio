@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
+import { Suspense, useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Billboard, RoundedBox } from '@react-three/drei';
@@ -356,13 +356,16 @@ export default function Experience() {
     >
       <Rig />
       <SunAndLights bloom={bloom} />
-      <Island />
-      <group position={MO} scale={S}>
-        <Module />
-      </group>
+      {/* os GLB baixam em paralelo; até lá o poster fica à mostra */}
+      <Suspense fallback={null}>
+        <Island />
+        <group position={MO} scale={S}>
+          <Module />
+        </group>
+        <Ready />
+      </Suspense>
       <Digital />
       <Backdrop />
-      <Ready />
       {bloom && (
         <EffectComposer multisampling={4}>
           <Bloom mipmapBlur intensity={0.55} luminanceThreshold={1.02} luminanceSmoothing={0.15} radius={0.7} />

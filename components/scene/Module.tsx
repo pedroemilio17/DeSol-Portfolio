@@ -2,17 +2,20 @@
 
 import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
-import { useFrame, useThree } from '@react-three/fiber';
-import { Html, RoundedBox } from '@react-three/drei';
+import { ThreeEvent, useFrame, useThree } from '@react-three/fiber';
+import { Html, useGLTF } from '@react-three/drei';
 import { live, near, remap, smooth, useUI } from '@/lib/state';
 import { layers } from '@/lib/content';
 import { C, M, MC, S, clipPlane } from './mats';
 
 /**
- * Placeholder do módulo DeSol feito em código.
- * Nomes dos objetos = docs/04_BLENDER_3D.md (o GLB real entra no lugar deste arquivo).
- * Unidades locais em metros; o grupo pai aplica a escala S.
+ * Módulo DeSol modelado no Blender (blender/build_desol.py → public/models/desol-module.glb).
+ * O código acha as peças pelo nome (DS_*) para explodir camadas, cortar, acender
+ * sensores e animar o ciclo. Vapor, raios, sal e o filete da calha são feitos aqui.
  */
+export const MODULE_URL = '/models/desol-module.glb';
+export const DRACO = '/draco/';
+
 const L = 1.14;
 const D = 0.64;
 const HF = 0.15;
@@ -21,7 +24,30 @@ const HB = HF + TAN * D;
 const Y0 = 0.05;
 const T = 0.02;
 const E = 0.04;
-const YB = Y0 + T + E; // fundo da bacia
+const YB = Y0 + T + E;
+
+type V3 = [number, number, number];
+type Mats = typeof M;
+
+/** Troca os materiais do GLB (M_*) pelos do site e liga sombras. */
+export function dress(root: THREE.Object3D, mats: Mats, over: Record<string, THREE.Material> = {}) {
+  const missing = new Set<string>();
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const raw = (mesh.material as THREE.Material).name.replace(/^M_/, '').replace(/\.\d+$/, '');
+    const key = (raw === 'sunSoft' ? 'sun2' : raw) as keyof Mats;
+    const m = over[raw] ?? mats[key];
+    if (m) mesh.material = m;
+    else missing.add(raw);
+    const glass = raw === 'glass';
+    mesh.castShadow = !glass;
+    mesh.receiveShadow = !glass;
+    if (glass) mesh.renderOrder = 5;
+  });
+  if (missing.size && process.env.NODE_ENV !== 'production') console.warn('[DeSol] materiais sem par no site:', [...missing]);
+  return root;
+}
 
 function wedge(depth: number, hF: number, hB: number, t: number) {
   const s = new THREE.Shape();
@@ -35,23 +61,6 @@ function wedge(depth: number, hF: number, hB: number, t: number) {
   g.rotateY(Math.PI / 2);
   g.translate(-t / 2, 0, 0);
   return g;
-}
-
-type V3 = [number, number, number];
-type Mat = THREE.Material;
-
-function B({ a, p, m, r = 0.006, rot }: { a: V3; p: V3; m: Mat; r?: number; rot?: V3 }) {
-  const rad = Math.min(r, Math.min(a[0], a[1], a[2]) / 2 - 0.0005);
-  return (
-    <RoundedBox args={a} radius={Math.max(rad, 0.0005)} smoothness={3} position={p} rotation={rot} material={m} castShadow receiveShadow />
-  );
-}
-function Cy({ r, h, p, m, rot, seg = 20 }: { r: number; h: number; p: V3; m: Mat; rot?: V3; seg?: number }) {
-  return (
-    <mesh position={p} rotation={rot} material={m} castShadow receiveShadow>
-      <cylinderGeometry args={[r, r, h, seg]} />
-    </mesh>
-  );
 }
 
 /** Deslocamento de cada peça na vista explodida (metros locais). */
@@ -123,36 +132,19 @@ void main(){
   gl_FragColor = vec4(0.93,0.98,1.0,a);
 }`;
 
-const DROPS = Array.from({ length: 9 }, (_, k) => ({
-  x: -0.46 + ((k * 0.61) % 1) * 0.52,
-  z: -0.26 + ((k * 0.37 + 0.13) % 1) * 0.36,
-}));
 const SALT = Array.from({ length: 7 }, (_, k) => ({
   x: -0.44 + ((k * 0.43) % 1) * 0.5,
   z: -0.2 + ((k * 0.71) % 1) * 0.4,
 }));
 
 export default function Module() {
-  const refs = useRef<Record<string, THREE.Group | null>>({});
-  const reg = (n: string) => (g: THREE.Group | null) => {
-    refs.current[n] = g;
-  };
+  const gltf = useGLTF(MODULE_URL, DRACO);
   const size = useThree((s) => s.size);
   const dpr = useThree((s) => s.viewport.dpr);
   const chapter = useUI((s) => s.chapter);
   const layer = useUI((s) => s.layer);
   const hoverLayer = useUI((s) => s.hoverLayer);
 
-  const g = useMemo(
-    () => ({
-      frameSide: wedge(D, HF, HB, T),
-      insSide: wedge(D - 2 * T, HF - T - 0.02, HB - T - 0.02, E),
-      shade: wedge(D - 2 * T - 2 * E, 0.07, HB - T - E - 0.03, 0.002),
-      fresh: new THREE.BoxGeometry(0.155, 0.22, 0.155).translate(0, 0.11, 0),
-      brine: new THREE.BoxGeometry(0.982, 0.018, 0.482).translate(0, 0.009, 0),
-    }),
-    [],
-  );
   const own = useMemo(() => {
     const brine = MC.brine.clone();
     brine.clippingPlanes = [clipPlane];
@@ -173,24 +165,42 @@ export default function Module() {
     const pos = new Float32Array(n * 3);
     const seed = new Float32Array(n);
     for (let i = 0; i < n; i++) {
-      const a = (i * 0.618034) % 1;
-      const b = (i * 0.754877) % 1;
-      pos[i * 3] = -0.47 + a * 0.55;
+      pos[i * 3] = -0.47 + ((i * 0.618034) % 1) * 0.55;
       pos[i * 3 + 1] = 0.14;
-      pos[i * 3 + 2] = -0.21 + b * 0.42;
+      pos[i * 3 + 2] = -0.21 + ((i * 0.754877) % 1) * 0.42;
       seed[i] = (i * 0.3819) % 1;
     }
     vg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     vg.setAttribute('aSeed', new THREE.BufferAttribute(seed, 1));
     vg.boundingSphere = new THREE.Sphere(new THREE.Vector3(-0.2, 0.25, 0), 1);
-    return { brine, shade, ray, glow, stream, vapor, vg, cBrine: new THREE.Color(C.brine), cHot: new THREE.Color('#FF8A2B'), cFresh: new THREE.Color(C.water) };
+    return {
+      brine, shade, ray, glow, stream, vapor, vg,
+      shadeGeo: wedge(D - 2 * T - 2 * E, 0.07, HB - T - E - 0.03, 0.002),
+      cBrine: new THREE.Color(C.brine), cHot: new THREE.Color('#FF8A2B'),
+    };
   }, []);
 
-  const drops = useRef<(THREE.Mesh | null)[]>([]);
+  // peças do GLB, com a posição de repouso guardada
+  const model = useMemo(() => {
+    const root = gltf.scene.clone(true);
+    dress(root, MC, { sun: own.glow, brine: own.brine });
+    const parts: Record<string, { o: THREE.Object3D; base: THREE.Vector3 }> = {};
+    const absent: string[] = [];
+    ORDER.forEach((n) => {
+      const o = root.getObjectByName(n);
+      if (o) parts[n] = { o, base: o.position.clone() };
+      else absent.push(n);
+    });
+    const drops: { o: THREE.Object3D; z0: number }[] = [];
+    root.traverse((o) => {
+      if (o.name.startsWith('DS_Drop_')) drops.push({ o, z0: o.position.z });
+    });
+    if (absent.length && process.env.NODE_ENV !== 'production') console.warn('[DeSol] objetos ausentes no GLB do módulo:', absent);
+    return { root, parts, drops, brine: root.getObjectByName('DS_Water_Brine'), fresh: root.getObjectByName('DS_Water_Fresh') };
+  }, [gltf, own]);
+
   const salt = useRef<(THREE.Mesh | null)[]>([]);
-  const fresh = useRef<THREE.Mesh>(null);
   const streamRef = useRef<THREE.Mesh>(null);
-  const brineRef = useRef<THREE.Mesh>(null);
 
   useFrame((state, dt) => {
     const t = live.snap ? 0 : state.clock.elapsedTime;
@@ -200,15 +210,16 @@ export default function Module() {
     // Cap. 4 — vista explodida com mola suave e leve escalonamento por peça
     const e = near(4, 0.35, 0.95);
     ORDER.forEach((name, idx) => {
-      const grp = refs.current[name];
-      if (!grp) return;
+      const part = model.parts[name];
+      if (!part) return;
       const d = EXPLODE[name];
       const ek = smooth(remap(e, idx * 0.02, 0.62 + idx * 0.02));
       const sel = e > 0.5 && ui.layer && LAYER_OF[name] === ui.layer ? 1 : 0;
       const hov = e > 0.5 && ui.hoverLayer && LAYER_OF[name] === ui.hoverLayer ? 1 : 0;
-      grp.position.x += (d[0] * ek + sel * 0.1 - grp.position.x) * k;
-      grp.position.y += (d[1] * ek + hov * 0.015 - grp.position.y) * k;
-      grp.position.z += (d[2] * ek + sel * 0.1 - grp.position.z) * k;
+      const p = part.o.position;
+      p.x += (part.base.x + d[0] * ek + sel * 0.1 - p.x) * k;
+      p.y += (part.base.y + d[1] * ek + hov * 0.015 - p.y) * k;
+      p.z += (part.base.z + d[2] * ek + sel * 0.1 - p.z) * k;
     });
 
     // Cap. 3 — corte lateral + ciclo controlado pelo scroll
@@ -223,178 +234,72 @@ export default function Module() {
     own.brine.color.copy(own.cBrine).lerp(own.cHot, heat * cut);
     own.brine.emissive.copy(own.cHot);
     own.brine.emissiveIntensity = heat * cut * 0.55;
-    if (brineRef.current) brineRef.current.scale.y = 1 - smooth(remap(p, 0.3, 0.9)) * 0.45 * cut;
+    if (model.brine) model.brine.scale.y = 1 - smooth(remap(p, 0.3, 0.9)) * 0.45 * cut;
     own.vapor.uniforms.uTime.value = t;
     own.vapor.uniforms.uAmt.value = cut * evap * (1 - smooth(remap(p, 0.92, 1)) * 0.4);
     own.vapor.uniforms.uSize.value = (0.042 * S * size.height * dpr) / 0.4986;
     salt.current.forEach((m, i) => {
       if (m) m.scale.setScalar(cut * smooth(remap(p, 0.34 + i * 0.03, 0.5 + i * 0.03)) + 0.0001);
     });
-    drops.current.forEach((m, i) => {
-      if (!m) return;
+    model.drops.forEach(({ o, z0 }, i) => {
       const a = smooth(remap(p, 0.48 + i * 0.012, 0.6 + i * 0.012));
       const sl = smooth(remap(p, 0.64 + i * 0.014, 0.8 + i * 0.014));
-      const z0 = DROPS[i].z;
-      m.position.z = z0 + (0.3 - z0) * sl;
+      o.position.z = z0 + (0.3 - z0) * sl;
       const s = cut > 0.01 ? a * (1 - smooth(remap(sl, 0.9, 1))) : 0.45 + 0.1 * Math.sin(i * 2.1);
-      m.scale.set(s, s * 0.6, s * (1 + sl * (1 - sl) * 2.4));
+      o.scale.set(s + 0.0001, s * 0.6 + 0.0001, s * (1 + sl * (1 - sl) * 2.4) + 0.0001);
     });
     if (streamRef.current) {
       const fl = cut * smooth(remap(p, 0.72, 0.84));
       streamRef.current.scale.x = fl + 0.0001;
       streamRef.current.visible = fl > 0.01;
     }
-    if (fresh.current) fresh.current.scale.y = cut > 0.01 ? 0.12 + fill * 0.75 : 0.55;
+    if (model.fresh) model.fresh.scale.y = cut > 0.01 ? 0.12 + fill * 0.75 : 0.55;
 
     // Cap. 5 — sensores acendem
     const dig = near(5, 0.3, 0.9);
     own.glow.emissiveIntensity = 1.2 + dig * (2.4 + Math.sin(t * 5) * 1.2);
   });
 
-  const pick = (name: string) => ({
-    onClick: (ev: { stopPropagation: () => void }) => {
-      const ui = useUI.getState();
-      if (ui.chapter !== 4 || !LAYER_OF[name]) return;
-      ev.stopPropagation();
-      ui.set({ layer: LAYER_OF[name] });
-    },
-    onPointerOver: (ev: { stopPropagation: () => void }) => {
-      const ui = useUI.getState();
-      if (ui.chapter !== 4 || !LAYER_OF[name]) return;
-      ev.stopPropagation();
-      ui.set({ hoverLayer: LAYER_OF[name] });
-    },
-    onPointerOut: () => {
-      if (useUI.getState().hoverLayer) useUI.getState().set({ hoverLayer: null });
-    },
-  });
+  /** Sobe na hierarquia até achar a peça nomeada que representa uma camada. */
+  const layerOf = (o: THREE.Object3D | null) => {
+    for (let n = o; n; n = n.parent) if (LAYER_OF[n.name]) return LAYER_OF[n.name];
+    return null;
+  };
+  const onClick = (ev: ThreeEvent<MouseEvent>) => {
+    const ui = useUI.getState();
+    const l = ui.chapter === 4 ? layerOf(ev.object) : null;
+    if (!l) return;
+    ev.stopPropagation();
+    ui.set({ layer: l });
+  };
+  const onOver = (ev: ThreeEvent<PointerEvent>) => {
+    const ui = useUI.getState();
+    const l = ui.chapter === 4 ? layerOf(ev.object) : null;
+    if (!l) return;
+    ev.stopPropagation();
+    if (ui.hoverLayer !== l) ui.set({ hoverLayer: l });
+  };
+  const onOut = () => {
+    if (useUI.getState().hoverLayer) useUI.getState().set({ hoverLayer: null });
+  };
 
-  const xs = L / 2 - T / 2;
   const xi = L / 2 - T - E / 2;
   const zg = D / 2 - T - E / 2;
 
   return (
     <group name="DS_Module">
-      <group name="DS_Legs" ref={reg('DS_Legs')} {...pick('DS_Legs')}>
-        {[-1, 1].flatMap((sx) => [-1, 1].map((sz) => <B key={`${sx}${sz}`} a={[0.08, Y0 + 0.01, 0.08]} p={[sx * 0.47, Y0 / 2, sz * 0.23]} m={MC.wood} r={0.012} />))}
-      </group>
+      <primitive object={model.root} onClick={onClick} onPointerOver={onOver} onPointerOut={onOut} />
 
-      <group name="DS_Frame" ref={reg('DS_Frame')} {...pick('DS_Frame')}>
-        <B a={[L, T, D]} p={[0, Y0 + T / 2, 0]} m={MC.wood} />
-        <B a={[L, HF, T]} p={[0, Y0 + HF / 2, D / 2 - T / 2]} m={MC.wood} />
-        <B a={[L, HB, T]} p={[0, Y0 + HB / 2, -D / 2 + T / 2]} m={MC.wood} />
-        <mesh geometry={g.frameSide} position={[xs, Y0, 0]} material={MC.wood} castShadow receiveShadow />
-        <mesh geometry={g.frameSide} position={[-xs, Y0, 0]} material={MC.wood} castShadow receiveShadow />
-      </group>
-
-      <group name="DS_Insulation" ref={reg('DS_Insulation')} {...pick('DS_Insulation')}>
-        <B a={[L - 2 * T, E, D - 2 * T]} p={[0, Y0 + T + E / 2, 0]} m={MC.eps} />
-        <B a={[L - 2 * T, 0.085, E]} p={[0, Y0 + T + 0.0425, zg]} m={MC.eps} />
-        <B a={[L - 2 * T, HB - T - 0.03, E]} p={[0, Y0 + T + (HB - T - 0.03) / 2, -zg]} m={MC.eps} />
-        <mesh geometry={g.insSide} position={[xi, Y0 + T, 0]} material={MC.eps} castShadow />
-        <mesh geometry={g.insSide} position={[-xi, Y0 + T, 0]} material={MC.eps} castShadow />
-        <mesh geometry={g.shade} position={[-xi + E / 2 + 0.003, YB, 0]} material={own.shade} />
-      </group>
-
-      <group name="DS_Basin" ref={reg('DS_Basin')} {...pick('DS_Basin')}>
-        <B a={[1.0, 0.006, 0.5]} p={[0, YB + 0.003, 0]} m={MC.ink} r={0.002} />
-        <B a={[1.0, 0.045, 0.008]} p={[0, YB + 0.0225, 0.246]} m={MC.ink} r={0.003} />
-        <B a={[1.0, 0.045, 0.008]} p={[0, YB + 0.0225, -0.246]} m={MC.ink} r={0.003} />
-        <B a={[0.008, 0.045, 0.5]} p={[0.496, YB + 0.0225, 0]} m={MC.ink} r={0.003} />
-        <B a={[0.008, 0.045, 0.5]} p={[-0.496, YB + 0.0225, 0]} m={MC.ink} r={0.003} />
-      </group>
-
-      <group name="DS_Water_Brine" ref={reg('DS_Water_Brine')} {...pick('DS_Water_Brine')}>
-        <mesh ref={brineRef} geometry={g.brine} position={[0, YB + 0.006, 0]} material={own.brine} receiveShadow>
+      {/* Efeitos do ciclo (cap. 3), no mesmo referencial do modelo */}
+      <mesh geometry={own.shadeGeo} position={[-xi + E / 2 + 0.003, YB, 0]} material={own.shade} />
+      {SALT.map((s, i) => (
+        <mesh key={i} ref={(m) => { salt.current[i] = m; }} position={[s.x, YB + 0.022, s.z]} rotation={[0.4, i, 0.3]} material={MC.white} scale={0.0001}>
+          <octahedronGeometry args={[0.016, 0]} />
         </mesh>
-        {SALT.map((s, i) => (
-          <mesh key={i} ref={(m) => { salt.current[i] = m; }} position={[s.x, YB + 0.022, s.z]} rotation={[0.4, i, 0.3]} material={MC.white} scale={0.0001}>
-            <octahedronGeometry args={[0.016, 0]} />
-          </mesh>
-        ))}
-      </group>
-
-      <group name="DS_Sensor_Temp" ref={reg('DS_Sensor_Temp')} {...pick('DS_Sensor_Temp')}>
-        <Cy r={0.006} h={0.11} p={[-0.18, YB + 0.06, -0.12]} m={MC.alu} seg={10} />
-        <mesh position={[-0.18, YB + 0.125, -0.12]} material={own.glow}>
-          <sphereGeometry args={[0.016, 16, 12]} />
-        </mesh>
-      </group>
-
-      <group name="DS_Gutter" ref={reg('DS_Gutter')} {...pick('DS_Gutter')}>
-        <group position={[0, 0.158, zg]} rotation={[0, 0, 0.01]}>
-          <B a={[1.02, 0.005, 0.03]} p={[0, 0, 0]} m={MC.steel} r={0.002} />
-          <B a={[1.02, 0.022, 0.005]} p={[0, 0.011, 0.014]} m={MC.steel} r={0.002} />
-          <B a={[1.02, 0.022, 0.005]} p={[0, 0.011, -0.014]} m={MC.steel} r={0.002} />
-          <mesh ref={streamRef} position={[0, 0.008, 0]} material={own.stream} visible={false}>
-            <boxGeometry args={[1.0, 0.01, 0.022]} />
-          </mesh>
-        </group>
-      </group>
-
-      <group name="DS_Glass" ref={reg('DS_Glass')} {...pick('DS_Glass')}>
-        <group position={[0, Y0 + (HF + HB) / 2 + 0.006, 0]} rotation={[Math.atan(TAN), 0, 0]}>
-          <mesh material={MC.glass} renderOrder={5}>
-            <boxGeometry args={[L + 0.03, 0.01, D / Math.cos(Math.atan(TAN)) + 0.03]} />
-          </mesh>
-          {DROPS.map((d, i) => (
-            <mesh key={i} name={`DS_Drop_0${i + 1}`} ref={(m) => { drops.current[i] = m; }} position={[d.x, -0.014, d.z]} material={MC.water}>
-              <sphereGeometry args={[0.02, 14, 10]} />
-            </mesh>
-          ))}
-        </group>
-      </group>
-
-      <group name="DS_Outlet" ref={reg('DS_Outlet')}>
-        <Cy r={0.009} h={0.16} p={[-0.3, 0.165, D / 2 + 0.05]} rot={[Math.PI / 2, 0, 0]} m={MC.steel} seg={12} />
-      </group>
-      <group name="DS_Mineralizer" ref={reg('DS_Mineralizer')}>
-        <Cy r={0.034} h={0.23} p={[-0.3, 0.125, D / 2 + 0.13]} m={MC.paper} />
-        <Cy r={0.037} h={0.05} p={[-0.3, 0.13, D / 2 + 0.13]} m={MC.leaf} />
-        <Cy r={0.007} h={0.2} p={[-0.4, 0.03, D / 2 + 0.13]} rot={[0, 0, Math.PI / 2]} m={MC.steel} seg={10} />
-      </group>
-      <group name="DS_Collector" ref={reg('DS_Collector')}>
-        <RoundedBox args={[0.18, 0.25, 0.18]} radius={0.02} smoothness={3} position={[-0.5, 0.125, D / 2 + 0.14]} material={MC.glass} renderOrder={6} />
-        <B a={[0.19, 0.016, 0.19]} p={[-0.5, 0.008, D / 2 + 0.14]} m={MC.paper} r={0.006} />
-      </group>
-      <group name="DS_Water_Fresh" ref={reg('DS_Water_Fresh')}>
-        <mesh ref={fresh} geometry={g.fresh} position={[-0.5, 0.018, D / 2 + 0.14]} material={MC.water} />
-      </group>
-      <group name="DS_Sensor_Level" ref={reg('DS_Sensor_Level')} {...pick('DS_Sensor_Level')}>
-        <B a={[0.08, 0.03, 0.05]} p={[-0.5, 0.266, D / 2 + 0.14]} m={MC.paper} r={0.008} />
-        <mesh position={[-0.5, 0.286, D / 2 + 0.14]} material={own.glow}>
-          <sphereGeometry args={[0.009, 12, 8]} />
-        </mesh>
-      </group>
-      <group name="DS_Sensor_TDS" ref={reg('DS_Sensor_TDS')} {...pick('DS_Sensor_TDS')}>
-        <Cy r={0.006} h={0.17} p={[-0.45, 0.18, D / 2 + 0.19]} m={MC.alu} seg={10} />
-        <mesh position={[-0.45, 0.272, D / 2 + 0.19]} material={own.glow}>
-          <sphereGeometry args={[0.011, 12, 8]} />
-        </mesh>
-      </group>
-
-      <group name="DS_Electronics" ref={reg('DS_Electronics')} {...pick('DS_Electronics')}>
-        <B a={[0.045, 0.09, 0.13]} p={[L / 2 + 0.022, 0.2, -0.05]} m={MC.ink} r={0.01} />
-        <B a={[0.004, 0.036, 0.075]} p={[L / 2 + 0.046, 0.21, -0.05]} m={own.glow} r={0.001} />
-      </group>
-      <group name="DS_Antenna" ref={reg('DS_Antenna')} {...pick('DS_Antenna')}>
-        <Cy r={0.004} h={0.12} p={[L / 2 + 0.022, 0.3, -0.1]} m={MC.ink} seg={8} />
-        <mesh position={[L / 2 + 0.022, 0.365, -0.1]} material={MC.ink}>
-          <sphereGeometry args={[0.009, 10, 8]} />
-        </mesh>
-      </group>
-      <group name="DS_SolarPanel" ref={reg('DS_SolarPanel')}>
-        <Cy r={0.011} h={0.56} p={[0.44, 0.28, -D / 2 - 0.1]} m={MC.alu} seg={10} />
-        <group position={[0.44, 0.58, -D / 2 - 0.1]} rotation={[0.5, 0.35, 0]}>
-          <B a={[0.36, 0.016, 0.26]} p={[0, 0, 0]} m={MC.ink} r={0.006} />
-          <B a={[0.34, 0.004, 0.006]} p={[0, 0.009, 0]} m={MC.alu} r={0.001} />
-          <B a={[0.006, 0.004, 0.24]} p={[-0.085, 0.009, 0]} m={MC.alu} r={0.001} />
-          <B a={[0.006, 0.004, 0.24]} p={[0.085, 0.009, 0]} m={MC.alu} r={0.001} />
-        </group>
-      </group>
-
-      {/* Efeitos do ciclo (cap. 3) */}
-      <group name="DS_Vapor_Anchor" position={[0, YB + 0.03, 0]} />
+      ))}
+      <mesh ref={streamRef} position={[0, 0.167, zg]} material={own.stream} visible={false}>
+        <boxGeometry args={[1.0, 0.01, 0.02]} />
+      </mesh>
       <points geometry={own.vg} material={own.vapor} renderOrder={4} />
       {[-0.17, -0.05, 0.07, 0.19].map((z, i) => (
         <mesh key={i} position={[-0.22 + (i % 2) * 0.12, 0.43, z - 0.08]} rotation={[-0.28, 0, 0]} material={own.ray}>
@@ -425,24 +330,23 @@ export default function Module() {
   );
 }
 
-/** Versão enxuta para os quatro módulos do cap. 7. */
+const LITE = ['DS_Legs', 'DS_Frame', 'DS_Insulation', 'DS_Basin', 'DS_Water_Brine', 'DS_Gutter', 'DS_Glass', 'DS_Collector', 'DS_Water_Fresh'];
+
+/** Cópia enxuta do mesmo GLB para os quatro módulos do cap. 7. */
 export function ModuleLite() {
-  const side = useMemo(() => wedge(D, HF, HB, T), []);
-  const xs = L / 2 - T / 2;
-  return (
-    <group>
-      <B a={[L, T + Y0, D]} p={[0, (Y0 + T) / 2, 0]} m={M.wood} />
-      <B a={[L, HF, T]} p={[0, Y0 + HF / 2, D / 2 - T / 2]} m={M.wood} />
-      <B a={[L, HB, T]} p={[0, Y0 + HB / 2, -D / 2 + T / 2]} m={M.wood} />
-      <mesh geometry={side} position={[xs, Y0, 0]} material={M.wood} castShadow />
-      <mesh geometry={side} position={[-xs, Y0, 0]} material={M.wood} castShadow />
-      <B a={[L - 2 * T, 0.06, D - 2 * T]} p={[0, YB, 0]} m={M.ink} r={0.003} />
-      <B a={[1.0, 0.012, 0.5]} p={[0, YB + 0.036, 0]} m={M.brine} r={0.003} />
-      <mesh position={[0, Y0 + (HF + HB) / 2 + 0.006, 0]} rotation={[Math.atan(TAN), 0, 0]} material={M.glass} renderOrder={5}>
-        <boxGeometry args={[L + 0.03, 0.01, D / Math.cos(Math.atan(TAN)) + 0.03]} />
-      </mesh>
-      <RoundedBox args={[0.18, 0.25, 0.18]} radius={0.02} smoothness={3} position={[-0.5, 0.125, D / 2 + 0.14]} material={M.glass} renderOrder={6} />
-      <B a={[0.155, 0.13, 0.155]} p={[-0.5, 0.08, D / 2 + 0.14]} m={M.water} r={0.01} />
-    </group>
-  );
+  const gltf = useGLTF(MODULE_URL, DRACO);
+  const root = useMemo(() => {
+    const r = dress(gltf.scene.clone(true), M);
+    r.children.forEach((c) => {
+      c.visible = LITE.includes(c.name);
+    });
+    r.traverse((o) => {
+      if (o.name.startsWith('DS_Drop_')) o.visible = false;
+      if (o.name === 'DS_Water_Fresh') o.scale.y = 0.6;
+    });
+    return r;
+  }, [gltf]);
+  return <primitive object={root} />;
 }
+
+useGLTF.preload(MODULE_URL, DRACO);
