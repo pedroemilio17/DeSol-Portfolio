@@ -109,6 +109,14 @@ const TAGS: { key: string; p: V3 }[] = [
   { key: 'DS_Sensors', p: [L / 2 + 0.12, 0.3, -0.05] },
 ];
 
+/** Cap. 3 — rótulos de fluxo sobre o corte; cada um aparece a partir do seu passo. */
+const FLOW: { text: string; p: V3; from: number; tone: string }[] = [
+  { text: 'Vapor sobe ↑', p: [0.2, 0.25, -0.02], from: 2, tone: '' },
+  { text: 'Sal fica na bacia', p: [0.2, YB - 0.05, 0.14], from: 2, tone: 'brine' },
+  { text: '← Destilado sai', p: [0.2, 0.2, 0.36], from: 4, tone: 'water' },
+  { text: 'Água salobra entra', p: [0.2, YB - 0.05, -0.14], from: 0, tone: 'brine' },
+];
+
 const vaporVert = /* glsl */ `
 uniform float uTime; uniform float uAmt; uniform float uSize;
 attribute float aSeed; varying float vA;
@@ -144,6 +152,7 @@ export default function Module() {
   const chapter = useUI((s) => s.chapter);
   const layer = useUI((s) => s.layer);
   const hoverLayer = useUI((s) => s.hoverLayer);
+  const step = useUI((s) => s.step);
 
   const own = useMemo(() => {
     const brine = MC.brine.clone();
@@ -306,6 +315,15 @@ export default function Module() {
           <boxGeometry args={[0.01, 0.62, 0.01]} />
         </mesh>
       ))}
+
+      {chapter === 3 &&
+        FLOW.map((f) => (
+          <Html key={f.text} position={f.p} center zIndexRange={[5, 0]}>
+            <span className={`flow3d${step >= f.from ? ' is-on' : ''}`} data-tone={f.tone}>
+              {f.text}
+            </span>
+          </Html>
+        ))}
 
       {/* Rótulos numerados da vista explodida */}
       {chapter === 4 &&

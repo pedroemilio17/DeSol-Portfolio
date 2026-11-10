@@ -18,6 +18,14 @@ const goTo = (id: string) => {
   else el.scrollIntoView();
   history.replaceState(null, '', `#${id}`);
 };
+/** Leva o scroll do cap. 3 até o passo i do ciclo (mesma conta do compute, ao contrário). */
+const goToStep = (i: number) => {
+  const s = document.getElementById('como-funciona');
+  if (!s) return;
+  const y = s.offsetTop + s.offsetHeight * (0.14 + (cycleStops[i] + 0.02) * 0.72) - innerHeight / 2;
+  if (lenis) lenis.scrollTo(y, { duration: 0.9 });
+  else scrollTo(0, y);
+};
 
 function hasWebGL() {
   try {
@@ -89,7 +97,12 @@ export function ScrollDriver() {
     };
 
     if (!reduced) {
-      lenis = new Lenis({ lerp: 0.1, wheelMultiplier: 0.9 });
+      lenis = new Lenis({
+        lerp: 0.1,
+        wheelMultiplier: 0.9,
+        // card mais alto que a tela rola por dentro, com o scroll nativo
+        prevent: (n) => n.classList?.contains('card') && n.scrollHeight > n.clientHeight + 1,
+      });
       lenis.on('scroll', compute);
       (window as unknown as { __lenis: Lenis }).__lenis = lenis;
       const tick = (t: number) => lenis?.raf(t * 1000);
@@ -143,7 +156,21 @@ export function ScrollDriver() {
     };
     document.addEventListener('click', onHash);
 
+    // modo apresentação: ← → andam por capítulo; dentro do ciclo, por passo
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+      if (e.altKey || e.ctrlKey || e.metaKey || (e.target as HTMLElement).closest?.('input,textarea,select,[contenteditable]')) return;
+      const { chapter, step } = useUI.getState();
+      const d = e.key === 'ArrowRight' ? 1 : -1;
+      e.preventDefault();
+      if (mode === '3d' && chapter === 3 && step + d >= 0 && step + d < cycleStops.length) return goToStep(step + d);
+      const n = chapter + d;
+      if (n >= 0 && n < chapters.length) goTo(chapters[n].id);
+    };
+    addEventListener('keydown', onKey);
+
     return () => {
+      removeEventListener('keydown', onKey);
       removeEventListener('scroll', compute);
       removeEventListener('resize', compute);
       removeEventListener('pointermove', move);
@@ -195,6 +222,39 @@ export function DotNav() {
         ))}
       </ol>
     </nav>
+  );
+}
+
+/** Nome do capítulo atual no cabeçalho. Decorativo: o DotNav já anuncia aria-current. */
+export function ChapterLabel() {
+  const chapter = useUI((s) => s.chapter);
+  if (chapter === 0) return null;
+  return (
+    <p className="top__where" aria-hidden="true">
+      <i>
+        {String(chapter).padStart(2, '0')} / {String(chapters.length - 1).padStart(2, '0')}
+      </i>{' '}
+      {chapters[chapter].nav}
+    </p>
+  );
+}
+
+/** Troca entre a cena 3D e a versão estática (posters), para aparelhos modestos. */
+export function LiteToggle() {
+  const mode = useUI((s) => s.mode);
+  if (mode === 'pending') return null;
+  if (mode === '3d')
+    return (
+      <a className="top__lite" href="?static">
+        Modo leve
+      </a>
+    );
+  // sem WebGL não há 3D para voltar
+  if (!/[?&]static/.test(location.search)) return null;
+  return (
+    <a className="top__lite" href={location.pathname}>
+      Ver em 3D
+    </a>
   );
 }
 
@@ -279,8 +339,14 @@ export function CycleSteps() {
     <ol className={`steps${is3d ? ' steps--live' : ''}`}>
       {cycleSteps.map((s, i) => (
         <li key={s.title} className={i === step ? 'is-on' : i < step ? 'is-done' : ''} aria-current={is3d && i === step ? 'step' : undefined}>
-          <span className="steps__n">{i + 1}</span>
-          <p>
+          {is3d ? (
+            <button type="button" className="steps__n" aria-label={`Ir para o passo ${i + 1}: ${s.title}`} onClick={() => goToStep(i)}>
+              {i + 1}
+            </button>
+          ) : (
+            <span className="steps__n">{i + 1}</span>
+          )}
+          <p onClick={is3d ? () => goToStep(i) : undefined}>
             <strong>{s.title}</strong> {s.text}
           </p>
         </li>

@@ -5,6 +5,7 @@ const LABEL: Record<BadgeKind, string> = {
   projetado: 'Projetado',
   estimado: 'Estimado',
   demo: 'Demo',
+  pendente: 'Pendente',
 };
 
 export function Badge({ kind, children }: { kind: BadgeKind; children?: React.ReactNode }) {

@@ -2,7 +2,7 @@
  * Copy do site (docs/02_HISTORIA.md). Só PT por enquanto; para EN, duplique
  * este objeto com as mesmas chaves e selecione pelo locale em site.config.ts.
  */
-export type BadgeKind = 'confirmado' | 'projetado' | 'estimado' | 'demo';
+export type BadgeKind = 'confirmado' | 'projetado' | 'estimado' | 'demo' | 'pendente';
 
 export const chapters = [
   { id: 'abertura', nav: 'Abertura', theme: 'ink' },
@@ -73,21 +73,22 @@ export const layers = [
   },
 ] as const;
 
+/** Três níveis de evidência, do que já existe ao que falta medir. */
 export const digital = [
   {
-    title: 'Gêmeo digital 3D',
-    text: '12 componentes inspecionáveis, visão 360°, modo apresentação.',
-    badge: null,
-  },
-  {
-    title: 'Integração ESP32',
+    title: 'Feito · Integração ESP32',
     text: 'Firmware, validação e ponte local integrados ao repositório em 20/10/2026.',
     badge: 'confirmado' as BadgeKind,
   },
   {
-    title: 'Origem de cada leitura',
-    text: 'Real, ausente ou simulada, sempre indicada.',
-    badge: null,
+    title: 'Demonstração · Gêmeo digital 3D',
+    text: '12 componentes inspecionáveis e visão 360°. As leituras da tela são simuladas e cada uma indica a origem: real, ausente ou simulada.',
+    badge: 'demo' as BadgeKind,
+  },
+  {
+    title: 'Falta medir · Ensaios físicos',
+    text: 'Vazão, temperatura da bacia e qualidade da água ainda não têm série de medições. Nenhum valor de desempenho desta página vem de ensaio.',
+    badge: 'pendente' as BadgeKind,
   },
 ];
 

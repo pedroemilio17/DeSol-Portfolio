@@ -1,4 +1,4 @@
-import { CrystalList, Counter, Cursor, CycleSteps, DotNav, LayerList, Names, ScrollDriver, Stage } from '@/components/Client';
+import { ChapterLabel, CrystalList, Counter, Cursor, CycleSteps, DotNav, LayerList, LiteToggle, Names, ScrollDriver, Stage } from '@/components/Client';
 import { Badge, Kicker, LogoMark, Title } from '@/components/ui';
 import { digital, nextSteps, team, timeline } from '@/lib/content';
 import { mailto, site } from '@/site.config';
@@ -24,9 +24,13 @@ export default function Page() {
           <LogoMark size={30} />
           <span>DeSol</span>
         </a>
-        <a href="#contato" className="top__cta">
-          Falar com a equipe
-        </a>
+        <ChapterLabel />
+        <div className="top__right">
+          <LiteToggle />
+          <a href="#contato" className="top__cta">
+            Falar com a equipe
+          </a>
+        </div>
       </header>
       <DotNav />
 
@@ -44,6 +48,7 @@ export default function Page() {
               </p>
               <p className="hint rv">
                 Role para seguir uma gota <span aria-hidden="true">↓</span>
+                <kbd className="hint__keys">ou use as setas ← →</kbd>
               </p>
             </div>
             <p className="hero__foot">Senac Quantum · Cuiabá, Mato Grosso · 2026</p>
@@ -144,13 +149,13 @@ export default function Page() {
             <div className="card">
               <div className="beat">
               <Kicker n={5}>O sistema digital</Kicker>
-              <Title>Não é um painel bonito: é a prova.</Title>
-              <p className="rv">O DeSol tem três camadas conectadas: o protótipo físico, o sistema digital e a investigação científica.</p>
+              <Title>Do protótipo aos dados.</Title>
+              <p className="rv">Três coisas diferentes, que o site não mistura: o que já foi feito, o que é demonstração e o que falta medir.</p>
               </div>
               <div className="beat">
               <p className="rv">
-                Um ESP32 lê os sensores e envia os dados; o gêmeo digital mostra o equipamento em 3D, com histórico, eventos e a origem de
-                cada leitura. Quando um dado é simulado, ele diz que é simulado.
+                Um ESP32 lê os sensores e o gêmeo digital mostra o equipamento em 3D. Hoje a tela roda com dados simulados: ela demonstra o
+                software, não valida o equipamento.
               </p>
               </div>
               <div className="beat">
@@ -198,7 +203,7 @@ export default function Page() {
             <ul className="band__nums">
               <li>
                 <strong className="band__sun">
-                  <Counter to={3} suffix="º" />
+                  3º
                 </strong>
                 <span>lugar no 2º Festival Estadual High Tech, categoria Robótica</span>
               </li>
@@ -210,7 +215,7 @@ export default function Page() {
               </li>
               <li>
                 <strong>
-                  <Counter to={2} /> <small>prêmios</small>
+                  2 <small>prêmios</small>
                 </strong>
                 <span>na 23ª Semana Nacional de Ciência e Tecnologia</span>
               </li>
@@ -254,6 +259,21 @@ export default function Page() {
                   <i />
                 </div>
                 <p className="note">Estimativa de projeto — será substituída por medição.</p>
+                <details className="calc">
+                  <summary>Como esse número foi calculado</summary>
+                  <ul>
+                    <li>
+                      Produção de referência: 4,8 a 5,4 L/m²/dia <Badge kind="estimado" />
+                    </li>
+                    <li>
+                      Área útil por módulo: 0,5 m² <Badge kind="projetado" />
+                    </li>
+                    <li>4,8 a 5,4 × 0,5 = 2,4 a 2,7 L/dia por módulo; × 4 módulos = 9,6 a 10,8 L/dia.</li>
+                    <li>
+                      Irradiância, temperatura ambiente e perdas reais ainda não foram registradas em ensaio <Badge kind="pendente" />
+                    </li>
+                  </ul>
+                </details>
               </div>
             </div>
           </div>
@@ -292,6 +312,10 @@ export default function Page() {
                 <a className="btn" href={mailto('Kit técnico DeSol')}>
                   Pedir o kit técnico
                 </a>
+                <p className="end__hint">
+                  O kit técnico é pedido por e-mail: o botão abre uma mensagem com o assunto “Kit técnico DeSol” e a equipe responde com a
+                  documentação disponível na data. O código já é público no GitHub.
+                </p>
               </div>
             </div>
           </div>

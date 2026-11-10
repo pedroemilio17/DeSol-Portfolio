@@ -104,6 +104,9 @@ strong {
   border: 1px solid var(--water);
   color: var(--water);
 }
+.badge--pendente {
+  border: 1px dashed currentColor;
+}
 [data-theme='paper'] .badge--estimado {
   color: #b5330f;
   border-color: #b5330f;
@@ -146,6 +149,38 @@ strong {
   transform: scale(1.2);
 }
 
+.flow3d {
+  display: block;
+  font: 600 11px/1 var(--font-mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  padding: 6px 9px;
+  border-radius: var(--radius-pill);
+  background: rgba(14, 15, 12, 0.82);
+  color: var(--paper);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 300ms;
+}
+.flow3d.is-on {
+  opacity: 1;
+}
+.flow3d[data-tone='water'] {
+  border-color: var(--water);
+  color: var(--water);
+}
+.flow3d[data-tone='brine'] {
+  border-color: var(--brine);
+  color: #ff8a6c;
+}
+@media (max-width: 820px) {
+  .flow3d {
+    display: none;
+  }
+}
+
 /* ---------- UI fixa ---------- */
 .top {
   position: fixed;
@@ -159,8 +194,53 @@ strong {
   color: var(--sun);
   transition: color var(--dur-base);
 }
+.top::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 -24px;
+  z-index: -1;
+  background: linear-gradient(rgba(14, 15, 12, 0.92) 35%, rgba(14, 15, 12, 0));
+}
+html[data-theme='paper'] .top::before {
+  background: linear-gradient(rgba(245, 241, 230, 0.94) 35%, rgba(245, 241, 230, 0));
+}
+html:not([data-ch]) .top::before,
+html[data-ch='0'] .top::before {
+  opacity: 0;
+}
 .top a {
   pointer-events: auto;
+}
+.top__right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.top__where,
+.top__lite {
+  font: 600 0.74rem/1 var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--paper);
+}
+.top__where i {
+  font-style: normal;
+  color: var(--sun);
+  margin-right: 6px;
+}
+.top__lite {
+  padding: 11px 12px;
+  border-radius: var(--radius-pill);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.top__lite:hover {
+  color: var(--sun);
+}
+html[data-theme='paper'] .top__where,
+html[data-theme='paper'] .top__where i,
+html[data-theme='paper'] .top__lite {
+  color: var(--ink);
 }
 .top__logo {
   display: flex;
@@ -392,6 +472,16 @@ main {
   color: var(--paper) !important;
   padding-top: 10px;
 }
+.hint__keys {
+  font: inherit;
+  margin-left: 14px;
+  color: var(--text-on-ink-muted);
+}
+@media (hover: none), (max-width: 820px) {
+  .hint__keys {
+    display: none;
+  }
+}
 .hint span {
   display: inline-block;
   color: var(--sun);
@@ -543,10 +633,13 @@ main {
   transition: background 250ms, color 250ms, border-color 250ms;
 }
 .steps--live li {
-  opacity: 0.42;
+  cursor: pointer;
 }
-.steps--live li.is-done {
-  opacity: 0.7;
+.steps--live li p {
+  color: rgba(245, 241, 230, 0.86);
+}
+.steps--live li:hover {
+  background: rgba(255, 255, 255, 0.06);
 }
 .steps--live li.is-done .steps__n {
   background: var(--water);
@@ -554,8 +647,12 @@ main {
   color: var(--ink);
 }
 .steps--live li.is-on {
-  opacity: 1;
-  background: rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: inset 3px 0 0 var(--sun);
+}
+.steps--live li.is-on p,
+.steps--live li.is-on p strong {
+  color: #fff;
 }
 .steps--live li.is-on .steps__n {
   background: var(--sun);
@@ -757,6 +854,42 @@ main {
 .goal__num small {
   font-size: 0.5em;
 }
+.calc summary {
+  font: 600 0.78rem/1.4 var(--font-mono);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  color: var(--paper);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.calc ul {
+  margin-top: 8px;
+  display: grid;
+  gap: 6px;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: rgba(245, 241, 230, 0.86);
+}
+.calc li {
+  padding-left: 14px;
+  position: relative;
+}
+.calc li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.6em;
+  width: 6px;
+  height: 2px;
+  background: var(--sun);
+}
+.end__hint {
+  flex-basis: 100%;
+  font-size: var(--fs-small);
+  line-height: 1.5;
+  color: var(--text-on-ink-muted);
+  max-width: 30rem;
+}
 .goal__bar {
   height: 12px;
   border-radius: var(--radius-pill);
@@ -949,7 +1082,7 @@ html:not(.is-3d) .hero {
   margin: 0;
   display: flex;
   align-items: center;
-  padding: 72px var(--gutter) 24px;
+  padding: 84px var(--gutter) 20px;
 }
 .is-3d .ch--right .pin {
   justify-content: flex-end;
@@ -960,14 +1093,18 @@ html:not(.is-3d) .hero {
   width: min(100%, 30rem);
   padding: clamp(22px, 2.4vw, 34px);
   border-radius: var(--radius-lg);
-  background: linear-gradient(rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05)), rgba(14, 15, 12, 0.52);
+  background: linear-gradient(rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)), rgba(14, 15, 12, 0.76);
   border: 1px solid rgba(255, 255, 255, 0.18);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
   backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
   box-shadow: var(--shadow-card);
+  /* teto = área abaixo do cabeçalho; se ainda sobrar texto, rola dentro do card */
+  max-height: calc(100svh - 104px);
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 .is-3d [data-theme='paper'] .card {
-  background: rgba(245, 241, 230, 0.74);
+  background: rgba(245, 241, 230, 0.86);
   border-color: rgba(14, 15, 12, 0.12);
   box-shadow: 0 20px 60px -24px rgba(60, 40, 10, 0.35);
 }
@@ -1042,9 +1179,54 @@ html:not(.is-3d) .hero {
 }
 
 @media (min-width: 821px) {
+  /* O card some antes de subir para a faixa do cabeçalho e só aparece com o pin já parado:
+     dois cards nunca dividem a tela. --p = progresso do capítulo, --h = altura dele em telas. */
+  .is-3d .ch {
+    --h: 2;
+  }
+  .is-3d .ch--hero {
+    --h: 1.35;
+  }
+  .is-3d .ch--scrub {
+    --h: 4.3;
+  }
+  .is-3d .ch--long {
+    --h: 2.6;
+  }
+  .is-3d .pin > .card,
+  .is-3d .pin > .hero {
+    opacity: min(
+      clamp(0, calc((var(--p, 0.5) * var(--h) - 0.22) / 0.24), 1),
+      clamp(0, calc(1 - ((var(--p, 0.5) - 1) * var(--h) + 0.5) / 0.09), 1)
+    );
+  }
+  .is-3d .ch--hero .pin > .hero {
+    opacity: clamp(0, calc(1 - ((var(--p, 0.3) - 1) * var(--h) + 0.5) / 0.09), 1);
+  }
   .end__grid {
     grid-template-columns: 1.1fr 1fr;
     align-items: start;
+  }
+}
+
+/* Notebook baixo: card mais largo e compacto para caber abaixo do cabeçalho */
+@media (min-width: 821px) and (max-height: 820px) {
+  .is-3d .card {
+    width: min(100%, 33rem);
+    padding: 20px 24px;
+    font-size: 1rem;
+    line-height: 1.45;
+  }
+  .is-3d .card > * + *,
+  .is-3d .beat > * + * {
+    margin-top: 10px;
+  }
+  .readouts > div {
+    padding: 7px 0;
+  }
+  .readouts dd,
+  .marks li p {
+    font-size: 0.92rem;
   }
 }
 
@@ -1056,15 +1238,12 @@ html:not(.is-3d) .hero {
   .top__cta {
     display: none;
   }
-  .top::before {
-    content: '';
-    position: absolute;
-    inset: 0 0 -28px;
-    z-index: -1;
-    background: linear-gradient(rgba(14, 15, 12, 0.9) 30%, rgba(14, 15, 12, 0));
+  .top__where {
+    display: none;
   }
-  html[data-theme='paper'] .top::before {
-    background: linear-gradient(rgba(245, 241, 230, 0.92) 30%, rgba(245, 241, 230, 0));
+  .is-3d .card {
+    max-height: none;
+    overflow: visible;
   }
   .dots a {
     padding: 9px 9px;
