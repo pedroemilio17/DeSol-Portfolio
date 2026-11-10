@@ -193,12 +193,23 @@ export default function Module() {
   const model = useMemo(() => {
     const root = gltf.scene.clone(true);
     dress(root, MC, { sun: own.glow, brine: own.brine });
-    const parts: Record<string, { o: THREE.Object3D; base: THREE.Vector3 }> = {};
+    const parts: Record<string, { o: THREE.Object3D; base: THREE.Vector3; mats: { m: THREE.Material; op: number; tr: boolean }[] }> = {};
     const absent: string[] = [];
     ORDER.forEach((n) => {
       const o = root.getObjectByName(n);
-      if (o) parts[n] = { o, base: o.position.clone() };
-      else absent.push(n);
+      if (!o) return void absent.push(n);
+      // material próprio por peça, para esmaecer as outras quando uma camada é escolhida
+      const mats: { m: THREE.Material; op: number; tr: boolean }[] = [];
+      o.traverse((c) => {
+        const mesh = c as THREE.Mesh;
+        const src = mesh.material as THREE.Material;
+        // glow e brine são animados por referência no ciclo: ficam compartilhados
+        if (!mesh.isMesh || src === own.glow || src === own.brine) return;
+        const m = src.clone();
+        mesh.material = m;
+        mats.push({ m, op: m.opacity, tr: m.transparent });
+      });
+      parts[n] = { o, base: o.position.clone(), mats };
     });
     const drops: { o: THREE.Object3D; z0: number }[] = [];
     root.traverse((o) => {
@@ -229,6 +240,11 @@ export default function Module() {
       p.x += (part.base.x + d[0] * ek + sel * 0.1 - p.x) * k;
       p.y += (part.base.y + d[1] * ek + hov * 0.015 - p.y) * k;
       p.z += (part.base.z + d[2] * ek + sel * 0.1 - p.z) * k;
+      const dim = e > 0.5 && ui.layer && !sel;
+      part.mats.forEach(({ m, op, tr }) => {
+        m.opacity += ((dim ? op * 0.16 : op) - m.opacity) * k;
+        m.transparent = tr || m.opacity < op - 0.01;
+      });
     });
 
     // Cap. 3 — corte lateral + ciclo controlado pelo scroll
