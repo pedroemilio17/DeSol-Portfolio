@@ -55,17 +55,23 @@ export default function Page() {
           <div className="pin">
             <Poster n={1} alt="Poço de água salobra na ilha, com três cristais de sal em suspensão" />
             <div className="card" data-cursor="brine">
+              <div className="beat">
               <Kicker n={1}>O problema</Kicker>
               <Title>Ter água não é o mesmo que poder beber.</Title>
               <p className="rv">
                 Em comunidades rurais e isoladas, existe poço, existe reservatório — mas a água é salobra. Os sais dissolvidos precisam sair
                 antes do consumo.
               </p>
+              </div>
+              <div className="beat">
               <p className="rv">
                 As soluções de fora dependem de estrada, eletricidade, troca de membrana e técnico. Quando uma dessas peças falha, a água
                 para.
               </p>
+              </div>
+              <div className="beat">
               <CrystalList />
+              </div>
             </div>
           </div>
         </section>
@@ -75,18 +81,24 @@ export default function Page() {
           <div className="pin">
             <Poster n={2} alt="A ilha em miniatura sobre uma mesa de laboratório, com três folhas de rascunho" />
             <div className="card">
+              <div className="beat">
               <Kicker n={2}>A origem</Kicker>
               <Title>De uma pesquisa de mestrado para uma sala de aula.</Title>
               <p className="rv">
                 O orientador João Pedro Cunha trouxe uma pesquisa do mestrado e decidiu aprofundá-la com os alunos do curso técnico em
                 Inteligência Artificial do Senac Quantum, em Cuiabá, no Programa Desenvolve AI.
               </p>
+              </div>
+              <div className="beat">
               <p className="rv">
                 O raciocínio foi uma decisão de engenharia, não a invenção de um princípio novo: água disponível mas imprópria → separar os
                 sais → pouca energia e infraestrutura → usar o sol → evaporar, condensar e coletar num equipamento modular.
               </p>
+              </div>
+              <div className="beat">
               <Names />
               <p className="note rv">Três nomes, uma ideia ficando mais clara.</p>
+              </div>
             </div>
           </div>
         </section>
@@ -130,13 +142,18 @@ export default function Page() {
           <div className="pin">
             <Poster n={5} alt="Sensores do módulo acesos, com linhas de dados chegando a um tablet com o painel em modo demonstração" />
             <div className="card">
+              <div className="beat">
               <Kicker n={5}>O sistema digital</Kicker>
               <Title>Não é um painel bonito: é a prova.</Title>
               <p className="rv">O DeSol tem três camadas conectadas: o protótipo físico, o sistema digital e a investigação científica.</p>
+              </div>
+              <div className="beat">
               <p className="rv">
                 Um ESP32 lê os sensores e envia os dados; o gêmeo digital mostra o equipamento em 3D, com histórico, eventos e a origem de
                 cada leitura. Quando um dado é simulado, ele diz que é simulado.
               </p>
+              </div>
+              <div className="beat">
               <dl className="readouts">
                 {digital.map((d) => (
                   <div key={d.title} className="rv">
@@ -153,6 +170,7 @@ export default function Page() {
                   Ver o código no GitHub <span aria-hidden="true">→</span>
                 </a>
               </p>
+              </div>
             </div>
           </div>
         </section>
@@ -208,11 +226,14 @@ export default function Page() {
           <div className="pin">
             <Poster n={7} alt="Quatro módulos DeSol lado a lado e a caixa d'água da ilha enchendo" />
             <div className="card">
+              <div className="beat">
               <Kicker n={7}>O próximo capítulo</Kicker>
               <Title>Agora, medir.</Title>
               <p className="rv">
                 Prêmio mostra que a ideia convence. O próximo passo é provar, com dados, quanto o DeSol produz e com que qualidade.
               </p>
+              </div>
+              <div className="beat">
               <ol className="marks">
                 {nextSteps.map((s, i) => (
                   <li key={s.title} className="rv">
@@ -223,7 +244,8 @@ export default function Page() {
                   </li>
                 ))}
               </ol>
-              <div className="goal">
+              </div>
+              <div className="beat goal">
                 <p className="goal__label">Meta de escala · quatro módulos</p>
                 <p className="goal__num">
                   9,6 a 10,8 <small>L/dia</small> <Badge kind="estimado" />
@@ -241,10 +263,12 @@ export default function Page() {
         <section id="contato" data-chapter="8" data-theme="ink" className="ch ch--end">
           <Poster n={8} alt="Vista aérea da ilha ao pôr do sol" />
           <div className="end">
-            <Kicker n={8}>Equipe e contato</Kicker>
-            <Title className="title--end">Quer ver isso funcionando no seu território?</Title>
+            <div className="beat">
+              <Kicker n={8}>Equipe e contato</Kicker>
+              <Title className="title--end">Quer ver isso funcionando no seu território?</Title>
+            </div>
             <div className="end__grid rv">
-              <dl>
+              <dl className="beat">
                 <div>
                   <dt>Equipe</dt>
                   <dd>{team.join(' · ')}</dd>
@@ -258,7 +282,7 @@ export default function Page() {
                   <dd>Senac Quantum · Programa Desenvolve AI · Cuiabá-MT</dd>
                 </div>
               </dl>
-              <div className="end__cta">
+              <div className="end__cta beat">
                 <a className="btn btn--sun" href={mailto('Contato DeSol')}>
                   Falar com a equipe
                 </a>
